@@ -2,7 +2,7 @@ import os
 import sys
 import random
 import telebot
-import ffmpeg
+import subprocess
 from dotenv import load_dotenv
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -83,24 +83,21 @@ def handle_video(message):
         bot.edit_message_text(f"🎧 Music mix ho raha hai...\n🎵 Song: {selected_song}", chat_id, msg.message_id)
         output_video_path = os.path.join(TEMP_DIR, f"output_{chat_id}_{message_id}.mp4")
 
-        video_stream = ffmpeg.input(input_video_path)['v']
-        audio_stream = ffmpeg.input(audio_path)['a']
-
-        (
-            ffmpeg
-            .output(
-                video_stream,
-                audio_stream,
-                output_video_path,
-                vcodec='copy',          # Video stream copy (fast)
-                acodec='aac',           # Audio to AAC (Instagram/TG compatible)
-                **{'b:a': '192k'},      # Correct FFmpeg parameter for audio bitrate
-                shortest=None,          # Jo chota ho wahan tak
-                map_metadata=-1
-            )
-            .overwrite_output()
-            .run(quiet=True)
-        )
+        command = [
+            'ffmpeg',
+            '-i', input_video_path,
+            '-i', audio_path,
+            '-map', '0:v:0',           # Pehle input se video
+            '-map', '1:a:0',           # Dusre input se audio
+            '-c:v', 'copy',            # Video copy (fast)
+            '-c:a', 'aac',             # Audio AAC
+            '-b:a', '192k',            # Audio bitrate
+            '-shortest',               # Video aur audio mein jo chota ho wahan tak katna
+            '-map_metadata', '-1',     # Metadata hatana
+            '-y',                      # Overwrite file agar exist karti ho
+            output_video_path
+        ]
+        subprocess.run(command, check=True, capture_output=True)
 
         # 4. Final video wapas bhejna
         bot.edit_message_text("🚀 Nayi video upload ho rahi hai...", chat_id, msg.message_id)
