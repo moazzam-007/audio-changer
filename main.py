@@ -4,6 +4,8 @@ import random
 import telebot
 import ffmpeg
 from dotenv import load_dotenv
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Load environment variables (local PC ke liye .env se)
 load_dotenv()
@@ -121,6 +123,27 @@ def handle_video(message):
         except Exception as e:
             print(f"Cleanup error: {e}")
 
+# ==========================================
+# Dummy Web Server for Render Web Service
+# ==========================================
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b"Bot is alive and running!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8000))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    print(f"🌐 Dummy Web Server listening on port {port}")
+    server.serve_forever()
+
 if __name__ == "__main__":
+    # Server ko alag thread mein start karo
+    server_thread = threading.Thread(target=run_dummy_server)
+    server_thread.daemon = True
+    server_thread.start()
+
     print("🤖 Bot start ho gaya hai. Waiting for messages...")
     bot.infinity_polling()
