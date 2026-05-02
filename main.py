@@ -4,8 +4,8 @@ import random
 import telebot
 import subprocess
 from dotenv import load_dotenv
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+from flask import Flask, request, jsonify
 
 # Load environment variables (local PC ke liye .env se)
 load_dotenv()
@@ -121,26 +121,42 @@ def handle_video(message):
             print(f"Cleanup error: {e}")
 
 # ==========================================
-# Dummy Web Server for Render Web Service
+# Flask Webhook Server
 # ==========================================
-class DummyHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b"Bot is alive and running!")
+app = Flask(__name__)
 
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 8000))
-    server = HTTPServer(('0.0.0.0', port), DummyHandler)
-    print(f"🌐 Dummy Web Server listening on port {port}")
-    server.serve_forever()
+@app.route('/', methods=['GET'])
+def index():
+    return "🤖 Telegram Audio Bot is running via Webhook!"
+
+@app.route('/telegram', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return '', 200
+    else:
+        return 'error', 403
+
+@app.route('/setup-webhook', methods=['GET'])
+def setup_webhook():
+    base_url = request.args.get('url', '').strip().rstrip('/')
+    if not base_url:
+        return jsonify({"success": False, "error": "url parameter missing"}), 400
+    
+    webhook_url = f"{base_url}/telegram"
+    bot.remove_webhook()
+    time.sleep(1)
+    result = bot.set_webhook(url=webhook_url)
+    if result:
+        return jsonify({"success": True, "message": "Webhook set successfully", "url": webhook_url})
+    else:
+        return jsonify({"success": False, "error": "Failed to set webhook"}), 500
 
 if __name__ == "__main__":
-    # Server ko alag thread mein start karo
-    server_thread = threading.Thread(target=run_dummy_server)
-    server_thread.daemon = True
-    server_thread.start()
-
-    print("🤖 Bot start ho gaya hai. Waiting for messages...")
-    bot.infinity_polling()
+    bot.remove_webhook()
+    time.sleep(1)
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🚀 Starting Flask server on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
