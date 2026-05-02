@@ -102,7 +102,7 @@ def handle_video(message):
         # 4. Final video wapas bhejna
         bot.edit_message_text("🚀 Nayi video upload ho rahi hai...", chat_id, msg.message_id)
         with open(output_video_path, 'rb') as video_to_send:
-            bot.send_video(chat_id, video_to_send, caption="✅ Ye lijiye aapki nayi video!")
+            bot.send_video(chat_id, video_to_send, caption="✅ Ye lijiye aapki nayi video!", timeout=120)
 
         # Processing wala message delete kar do (clean UI ke liye)
         bot.delete_message(chat_id, msg.message_id)
@@ -134,7 +134,9 @@ def webhook():
     if request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
+        # Webhook ko turant 200 OK return karne ke liye processing alag thread mein
+        import threading
+        threading.Thread(target=bot.process_new_updates, args=([update],)).start()
         return '', 200
     else:
         return 'error', 403
