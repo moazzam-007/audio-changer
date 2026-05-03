@@ -159,6 +159,19 @@ def setup_webhook():
 if __name__ == "__main__":
     bot.remove_webhook()
     time.sleep(1)
+    
+    # Auto-set webhook if on Render
+    RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "").strip().rstrip('/')
+    if RENDER_URL:
+        webhook_url = f"{RENDER_URL}/telegram"
+        result = bot.set_webhook(url=webhook_url)
+        if result:
+            print(f"✅ Webhook auto-set successfully: {webhook_url}")
+        else:
+            print("❌ Failed to auto-set webhook!")
+    else:
+        print("⚠️ RENDER_EXTERNAL_URL not found. Please set webhook manually via /setup-webhook")
+
     port = int(os.environ.get("PORT", 10000))
     print(f"🚀 Starting Flask server on port {port}")
     app.run(host="0.0.0.0", port=port, debug=False)
