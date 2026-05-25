@@ -1,0 +1,15 @@
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Temp video files
+temp_files/
+*.mp4
+!songs/*.mp4
+
+# OS generated files
+.DS_Store
+Thumbs.db

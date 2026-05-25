@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: telegram-audio-bot
+    env: docker
+    region: singapore # Change this if you prefer a different region
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false # Set this value manually in Render dashboard
+      - key: ALLOWED_CHAT_ID
+        sync: false # Set this value manually in Render dashboard
