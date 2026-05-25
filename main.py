@@ -6,6 +6,8 @@ import subprocess
 from dotenv import load_dotenv
 import time
 from flask import Flask, request, jsonify
+import requests as http_requests
+import uuid
 
 # Load environment variables (local PC ke liye .env se)
 load_dotenv()
@@ -140,6 +142,93 @@ def webhook():
         return '', 200
     else:
         return 'error', 403
+
+@app.route('/process-video', methods=['POST'])
+def process_video():
+    """
+    n8n se video URL lo, audio change karo, tmpfiles pe upload karo,
+    processed video URL return karo.
+    
+    Input JSON: { "video_url": "https://..." }
+    Output JSON: { "success": true, "output_url": "https://..." }
+    """
+    data = request.get_json()
+    if not data or 'video_url' not in data:
+        return jsonify({"success": False, "error": "video_url missing"}), 400
+
+    video_url = data['video_url']
+    unique_id = str(uuid.uuid4())[:8]
+    input_path = os.path.join(TEMP_DIR, f"input_{unique_id}.mp4")
+    output_path = os.path.join(TEMP_DIR, f"output_{unique_id}.mp4")
+
+    try:
+        # 1. Video URL se download karo
+        r = http_requests.get(video_url, timeout=120, stream=True)
+        r.raise_for_status()
+        with open(input_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        # 2. Random song uthao (same logic jo pehle se hai)
+        songs = [f for f in os.listdir(SONGS_DIR) if f.endswith('.mp3')]
+        if not songs:
+            return jsonify({"success": False, "error": "Songs folder empty hai"}), 500
+
+        selected_song = random.choice(songs)
+        audio_path = os.path.join(SONGS_DIR, selected_song)
+
+        # 3. FFmpeg se audio replace karo (same command jo pehle se hai)
+        command = [
+            'ffmpeg',
+            '-i', input_path,
+            '-i', audio_path,
+            '-map', '0:v:0',
+            '-map', '1:a:0',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-shortest',
+            '-map_metadata', '-1',
+            '-y',
+            output_path
+        ]
+        subprocess.run(command, check=True, capture_output=True)
+
+        # 4. tmpfiles.org pe upload karo
+        with open(output_path, 'rb') as f:
+            upload = http_requests.post(
+                'https://tmpfiles.org/api/v1/upload',
+                files={'file': f},
+                timeout=120
+            )
+        upload.raise_for_status()
+        upload_data = upload.json()
+
+        if not upload_data.get('data', {}).get('url'):
+            return jsonify({"success": False, "error": "tmpfiles upload fail"}), 500
+
+        # URL fix karo (dl/ add karo)
+        raw_url = upload_data['data']['url']
+        output_url = raw_url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://')
+
+        return jsonify({
+            "success": True,
+            "output_url": output_url,
+            "song_used": selected_song
+        })
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"success": False, "error": f"FFmpeg error: {e.stderr.decode()[:300]}"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    finally:
+        # Cleanup
+        for path in [input_path, output_path]:
+            try:
+                if path and os.path.exists(path):
+                    os.remove(path)
+            except:
+                pass
 
 @app.route('/setup-webhook', methods=['GET'])
 def setup_webhook():
