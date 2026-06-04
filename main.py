@@ -194,21 +194,22 @@ def process_video():
         ]
         subprocess.run(command, check=True, capture_output=True)
 
-        # 4. tempfile.org pe upload karo
+        # 4. tmpfiles.org pe upload karo
         with open(output_path, 'rb') as f:
             upload = http_requests.post(
-                'https://tempfile.org/api/upload/local',
-                files={'files': f},
-                data={'expiryHours': '1'},
+                'https://tmpfiles.org/api/v1/upload',
+                files={'file': f},
                 timeout=120
             )
         upload.raise_for_status()
         upload_data = upload.json()
 
-        if not upload_data.get('success') or not upload_data.get('files'):
-            return jsonify({"success": False, "error": "tempfile upload fail"}), 500
+        if not upload_data.get('data', {}).get('url'):
+            return jsonify({"success": False, "error": "tmpfiles upload fail"}), 500
 
-        output_url = upload_data['files'][0]['url'] + 'download'
+        # URL fix karo (dl/ add karo)
+        raw_url = upload_data['data']['url']
+        output_url = raw_url.replace('tmpfiles.org/', 'tmpfiles.org/dl/').replace('http://', 'https://')
 
         return jsonify({
             "success": True,
