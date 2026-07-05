@@ -103,7 +103,7 @@ def add_text_overlay(input_path, output_path, text, video_duration):
         "-vf", drawtext,
         "-c:v", "libx264",
         "-c:a", "copy",
-        "-preset", "fast",
+        "-preset", "ultrafast",
         "-crf", "23",
         "-y",
         output_path
@@ -209,7 +209,7 @@ def handle_video(message):
     
     finally:
         # 6. Zaroori Kadam: Server se files DELETE karna taki space bachi rahe
-        for p in [input_video_path, audio_output_path if 'audio_output_path' in dir() else "", output_video_path]:
+        for p in [input_video_path, locals().get('audio_output_path', ''), output_video_path]:
             try:
                 if p and os.path.exists(p):
                     os.remove(p)
