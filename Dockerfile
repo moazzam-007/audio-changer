@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Ensure directories exist
-RUN mkdir -p songs temp_files
+RUN mkdir -p songs temp_files fonts
 
 # Bot ko run karne ki command
 CMD ["python", "main.py"]

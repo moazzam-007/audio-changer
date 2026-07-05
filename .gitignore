@@ -7,9 +7,16 @@ __pycache__/
 
 # Temp video files
 temp_files/
+temp/
 *.mp4
 !songs/*.mp4
+
+# Test scripts (sirf local dev ke liye)
+test_*.py
 
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# fonts/ is tracked (Render ko chahiye)
+# fonts/ — DO NOT ignore
