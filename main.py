@@ -307,20 +307,20 @@ def process_video():
             import shutil
             shutil.copy2(audio_out_path, output_path)
 
-        # 4. catbox.moe pe upload karo (tmpfiles.org Cloudflare block karta hai)
+        # 4. uguu.se pe upload karo (catbox/tmpfiles se zyada reliable API hai)
         with open(output_path, 'rb') as f:
             upload = http_requests.post(
-                'https://catbox.moe/user/api.php',
-                data={'reqtype': 'fileupload'},
-                files={'fileToUpload': f},
+                'https://uguu.se/upload',
+                files={'files[]': ('video.mp4', f, 'video/mp4')},
                 timeout=120
             )
         upload.raise_for_status()
-
-        output_url = upload.text.strip()
         
-        if not output_url.startswith('http'):
-            return jsonify({"success": False, "error": f"Catbox upload fail: {output_url}"}), 500
+        upload_data = upload.json()
+        if not upload_data.get('success'):
+            return jsonify({"success": False, "error": f"Uguu upload fail"}), 500
+            
+        output_url = upload_data['files'][0]['url']
 
         return jsonify({
             "success": True,
