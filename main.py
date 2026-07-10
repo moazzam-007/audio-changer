@@ -307,20 +307,25 @@ def process_video():
             import shutil
             shutil.copy2(audio_out_path, output_path)
 
-        # 4. uguu.se pe upload karo (catbox/tmpfiles se zyada reliable API hai)
+        # 4. Litterbox pe upload karo (1 hour expiry)
         with open(output_path, 'rb') as f:
             upload = http_requests.post(
-                'https://uguu.se/upload',
-                files={'files[]': ('video.mp4', f, 'video/mp4')},
+                'https://litterbox.catbox.moe/resources/internals/api.php',
+                data={'reqtype': 'fileupload', 'time': '1h'},
+                files={'fileToUpload': f},
                 timeout=120
             )
         upload.raise_for_status()
         
-        upload_data = upload.json()
-        if not upload_data.get('success'):
-            return jsonify({"success": False, "error": f"Uguu upload fail"}), 500
-            
-        output_url = upload_data['files'][0]['url']
+        output_url = upload.text.strip()
+        
+        # Validation: Verify the file is actually accessible (Catch Cloudflare/WAF blocks instantly)
+        try:
+            head = http_requests.head(output_url, timeout=30)
+            if head.status_code not in (200, 301, 302):
+                return jsonify({"success": False, "error": f"URL blocked/inaccessible. Status: {head.status_code}"}), 500
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Validation failed: {e}"}), 500
 
         return jsonify({
             "success": True,
