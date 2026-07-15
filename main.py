@@ -5,9 +5,10 @@ import telebot
 import subprocess
 from dotenv import load_dotenv
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import requests as http_requests
 import uuid
+import io
 
 # Load environment variables (local PC ke liye .env se)
 load_dotenv()
@@ -307,44 +308,30 @@ def process_video():
             import shutil
             shutil.copy2(audio_out_path, output_path)
 
-        # 4. Litterbox pe upload karo (1 hour expiry)
+        # 5. Direct Binary Return (Read to memory buffer & send directly to n8n)
         with open(output_path, 'rb') as f:
-            upload = http_requests.post(
-                'https://litterbox.catbox.moe/resources/internals/api.php',
-                data={'reqtype': 'fileupload', 'time': '1h'},
-                files={'fileToUpload': f},
-                timeout=120
-            )
-        upload.raise_for_status()
-        
-        output_url = upload.text.strip()
-        
-        # Validation: Verify the file is actually accessible (Catch Cloudflare/WAF blocks instantly)
-        try:
-            head = http_requests.head(output_url, timeout=30)
-            if head.status_code not in (200, 301, 302):
-                return jsonify({"success": False, "error": f"URL blocked/inaccessible. Status: {head.status_code}"}), 500
-        except Exception as e:
-            return jsonify({"success": False, "error": f"Validation failed: {e}"}), 500
+            video_buffer = io.BytesIO(f.read())
+        video_buffer.seek(0)
 
-        return jsonify({
-            "success": True,
-            "output_url": output_url,
-            "song_used": selected_song
-        })
+        return send_file(
+            video_buffer,
+            mimetype='video/mp4',
+            as_attachment=True,
+            download_name='output.mp4'
+        )
 
     except subprocess.CalledProcessError as e:
         return jsonify({"success": False, "error": f"FFmpeg error: {e.stderr.decode()[:300]}"}), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     finally:
-        # Cleanup
-        for path in [input_path, output_path]:
+        # Cleanup all temp files including intermediate audio_out_path
+        for path in [input_path, locals().get('audio_out_path', ''), output_path]:
             try:
                 if path and os.path.exists(path):
                     os.remove(path)
-            except:
-                pass
+            except Exception as e:
+                print(f"Cleanup error: {e}")
 
 @app.route('/setup-webhook', methods=['GET'])
 def setup_webhook():
